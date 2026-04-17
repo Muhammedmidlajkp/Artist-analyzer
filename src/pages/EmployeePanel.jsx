@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Save, ClipboardPaste, AlertCircle } from 'lucide-react';
-import { getPendingEntries, savePendingEntry, removePendingEntry, submitEntry } from '../services/api';
+import { Save, ClipboardPaste, AlertCircle, RefreshCcw } from 'lucide-react';
+import Swal from 'sweetalert2';
+import { getPendingEntries, savePendingEntry, removePendingEntry, submitEntry, updatePendingEntry } from '../services/api';
 import PendingDataModal from '../components/PendingDataModal';
 
 const initialForm = {
@@ -59,16 +60,19 @@ export default function EmployeePanel() {
     if (!dateStr) return '';
     const clean = dateStr.trim();
     const date = new Date(clean);
-    
-    // Basic valid date check
+
     if (!isNaN(date.getTime())) {
-      return date.toISOString().split('T')[0];
+      // Use local components to avoid timezone shifting
+      const y = date.getFullYear();
+      const m = (date.getMonth() + 1).toString().padStart(2, '0');
+      const d = date.getDate().toString().padStart(2, '0');
+      return `${y}-${m}-${d}`;
     }
-    
+
     // Manual fallback for "APRIL 26" format
     const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
     const parts = clean.toLowerCase().split(/[\s,]+/);
-    
+
     let monthIdx = -1;
     let day = -1;
     let year = new Date().getFullYear();
@@ -118,9 +122,9 @@ export default function EmployeePanel() {
 
     // Smart split: prioritise TABS or PIPES over commas
     let cols = [];
-    if (row.includes('\t')) cols = row.split('\t');
-    else if (row.includes('|')) cols = row.split('|');
-    else cols = row.split(',');
+    if (pastedText.includes('\t')) cols = pastedText.split('\t');
+    else if (pastedText.includes('|')) cols = pastedText.split('|');
+    else cols = pastedText.split(',');
 
     cols = cols.map(s => s.trim());
 
@@ -141,10 +145,26 @@ export default function EmployeePanel() {
       if (cols[8]) newForm.discount = parseNum(cols[8]);
 
       newForm.totalRevenue = calculateTotal(newForm.packagePrice, newForm.extraCharges, newForm.discount);
-      
+
       setFormData(newForm);
       setErrors({});
     }
+  };
+
+  const isFormEmpty = () => {
+    return !formData.eventDate && !formData.brideName && !formData.packagePrice;
+  };
+
+  const isFullyComplete = () => {
+    return (
+      formData.eventDate &&
+      formData.brideName &&
+      formData.source &&
+      formData.artist &&
+      formData.packagePrice !== '' &&
+      formData.satisfaction &&
+      (formData.satisfaction !== 'Not Satisfied' || formData.issueNote)
+    );
   };
 
   const validate = () => {
@@ -154,50 +174,126 @@ export default function EmployeePanel() {
     if (!formData.source) newErrors.source = 'Source is required';
     if (!formData.artist) newErrors.artist = 'Artist is required';
     if (formData.packagePrice === '' || isNaN(formData.packagePrice)) newErrors.packagePrice = 'Valid Price is required';
+    if (!formData.satisfaction) newErrors.satisfaction = 'Satisfaction is required for final submission';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const saveToPending = () => {
-    savePendingEntry(formData);
+  const saveToPending = (silent = false) => {
+    if (currentEditingId) {
+      updatePendingEntry(currentEditingId, formData);
+    } else {
+      savePendingEntry(formData);
+    }
     setPendingEntries(getPendingEntries());
     setFormData(initialForm);
+    setCurrentEditingId(null);
     setErrors({});
-    setShowPendingModal(true);
+    if (!silent) {
+      Swal.fire({
+        title: 'Draft Saved',
+        text: 'Entry saved as Draft in Pending list (incomplete data).',
+        icon: 'info',
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)',
+        confirmButtonColor: 'var(--accent-primary)'
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSuccess(false);
 
-    if (!validate()) {
-      // If validation fails, prompt to save as pending
-      setShowPendingModal(true);
-      if (Object.values(formData).some(val => val !== '')) {
-        saveToPending();
-      }
+    if (isFormEmpty()) {
+      Swal.fire({
+        title: 'Empty Form',
+        text: 'Please fill at least some details before submitting.',
+        icon: 'warning',
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)',
+        confirmButtonColor: 'var(--accent-primary)'
+      });
       return;
     }
 
-    setLoading(true);
-    try {
-      await submitEntry(formData);
+    const isComplete = isFullyComplete();
 
-      if (currentEditingId) {
-        removePendingEntry(currentEditingId);
+    if (isComplete) {
+      setLoading(true);
+      try {
+        await submitEntry(formData);
+        if (currentEditingId) {
+          removePendingEntry(currentEditingId);
+        }
+        setSuccess(true);
+        setFormData(initialForm);
         setCurrentEditingId(null);
         setPendingEntries(getPendingEntries());
+        setTimeout(() => setSuccess(false), 3000);
+      } catch (err) {
+        Swal.fire({
+          title: 'Connection Error',
+          text: 'Failed to sync with Google Sheets. Saving to Pending instead.',
+          icon: 'error',
+          background: 'var(--bg-secondary)',
+          color: 'var(--text-primary)',
+          confirmButtonColor: 'var(--accent-primary)'
+        });
+        saveToPending(true);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Identify missing fields for the popup
+      const required = [
+        { key: 'eventDate', label: 'Event Date' },
+        { key: 'brideName', label: 'Bride Name' },
+        { key: 'source', label: 'Source' },
+        { key: 'artist', label: 'Artist' },
+        { key: 'packagePrice', label: 'Package Price' },
+        { key: 'satisfaction', label: 'Satisfaction' }
+      ];
+
+      const missing = required
+        .filter(f => !formData[f.key] || formData[f.key].toString().trim() === '')
+        .map(f => f.label);
+
+      if (missing.length > 0) {
+        Swal.fire({
+          title: 'Incomplete Entry',
+          html: `The following fields are missing:<br/><strong>${missing.join(', ')}</strong><br/><br/>Saving this as a Draft in the "Pending" list.`,
+          icon: 'info',
+          background: 'var(--bg-secondary)',
+          color: 'var(--text-primary)',
+          confirmButtonColor: 'var(--accent-primary)'
+        });
       }
 
-      setSuccess(true);
-      setFormData(initialForm);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      alert("Failed to submit entry. Saving to pending.");
-      saveToPending();
-    } finally {
-      setLoading(false);
+      saveToPending(true); // silent true because we just showed a custom alert
+    }
+  };
+
+  const handleClear = async () => {
+    if (Object.values(formData).some(val => val !== '')) {
+      const result = await Swal.fire({
+        title: 'Clear Form?',
+        text: 'This will reset all fields. Are you sure?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, clear it',
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)',
+        confirmButtonColor: 'var(--danger)',
+        cancelButtonColor: 'var(--border-color)'
+      });
+
+      if (result.isConfirmed) {
+        setFormData(initialForm);
+        setCurrentEditingId(null);
+        setErrors({});
+      }
     }
   };
 
@@ -270,7 +366,7 @@ export default function EmployeePanel() {
     try {
       // Save all imported rows to Pending Data (Local Storage)
       const pendingResults = importedData.map(entry => savePendingEntry(entry));
-      
+
       // Update the local list of pending entries
       setPendingEntries(getPendingEntries());
 
@@ -282,7 +378,7 @@ export default function EmployeePanel() {
       } else {
         setBulkStatus({ type: 'success', message: `${pendingResults.length} records added to "Pending" list for review.` });
       }
-      
+
       setBulkText('');
       setTimeout(() => setBulkStatus(null), 5000);
     } catch (err) {
@@ -313,11 +409,19 @@ export default function EmployeePanel() {
 
       {/* Bulk Paste Section */}
       <div className="card mb-6" style={{ border: '2px dashed var(--border-color)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-        <h3 className="mb-2" style={{ fontSize: '1.1rem' }}>Paste from Google Sheets / Excel</h3>
-        <p className="page-subtitle mb-4">Select the Artist and Source for this batch, then paste your 5 columns.</p>
-        <p className="mb-4" style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', backgroundColor: 'rgba(59, 130, 246, 0.05)', padding: '0.5rem', borderRadius: '4px', borderLeft: '3px solid var(--accent-primary)' }}>
-          <strong>Format:</strong> date | bride name | package price | extra charges | discount
-        </p>
+        <h3 className="mb-2" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          Quick Data Import
+        </h3>
+        <p className="page-subtitle mb-4">Select a default Artist and Source, then paste your data for instant extraction.</p>
+        <div className="mb-4" style={{ backgroundColor: 'rgba(59, 130, 246, 0.05)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid var(--accent-primary)' }}>
+          <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--accent-primary)', fontWeight: 600 }}>Copy this prompt</h4>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>
+            Extract data in this Format: <strong>event date | bride name | package price | extra charges | discount</strong>
+          </p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+            * Date should be in <strong>mm/dd/yyyy</strong> format.
+          </p>
+        </div>
 
         <div className="grid-2 mb-4" style={{ gap: '1rem' }}>
           <div className="form-group">
@@ -345,7 +449,7 @@ export default function EmployeePanel() {
         <textarea
           className="form-input mb-4"
           style={{ minHeight: '150px', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8rem' }}
-          placeholder="Paste columns from Excel/Sheets (Ctrl+V)...&#10;Columns: Date | Bride Name | Package Price | Extra Charges | Discount"
+          placeholder="Paste columns from Excel/Sheets (Ctrl+V)...&#10;Format: Event Date | Bride Name | Package Price | Extra Charges | Discount (mm/dd/yyyy)"
           value={bulkText}
           onChange={(e) => setBulkText(e.target.value)}
         ></textarea>
@@ -458,9 +562,21 @@ export default function EmployeePanel() {
           <button type="submit" className="btn btn-premium" disabled={loading}>
             {loading ? <div className="spinner"></div> : <><Save size={18} /> {currentEditingId ? 'Resubmit Entry' : 'Submit Entry'}</>}
           </button>
-          <div className="text-muted" style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardPaste size={16} /> Hint: Try pasting a row (Ctrl+V)
-          </div>
+
+          <button
+            type="button"
+            onClick={handleClear}
+            className="btn btn-secondary"
+            style={{
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <RefreshCcw size={18} /> Clear Form
+          </button>
         </div>
       </form>
 

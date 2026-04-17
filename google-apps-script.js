@@ -20,24 +20,34 @@ function doPost(e) {
     const entries = Array.isArray(data) ? data : [data];
     
     if (action === 'delete') {
-      const idToDelete = entries[0].recordId;
+      const idToDelete = entries[0].recordId.toString().trim();
+      Logger.log('Deleting ID: ' + idToDelete);
       const values = sheet.getDataRange().getValues();
+      let found = false;
       for (let i = 1; i < values.length; i++) {
-        if (values[i][0].toString() === idToDelete.toString()) {
+        const rowId = values[i][0].toString().trim();
+        if (rowId === idToDelete) {
           sheet.deleteRow(i + 1);
+          found = true;
+          Logger.log('Row deleted at: ' + (i + 1));
           break;
         }
       }
-      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Record deleted' }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ 
+        status: found ? 'success' : 'error', 
+        message: found ? 'Record deleted' : 'ID not found: ' + idToDelete 
+      })).setMimeType(ContentService.MimeType.JSON);
     }
     
     if (action === 'update') {
       const entryToUpdate = entries[0];
-      const idToUpdate = entryToUpdate.recordId;
+      const idToUpdate = entryToUpdate.recordId.toString().trim();
+      Logger.log('Updating ID: ' + idToUpdate);
       const values = sheet.getDataRange().getValues();
+      let found = false;
       for (let i = 1; i < values.length; i++) {
-        if (values[i][0].toString() === idToUpdate.toString()) {
+        const rowId = values[i][0].toString().trim();
+        if (rowId === idToUpdate) {
           const rowData = [
             idToUpdate,
             entryToUpdate.eventDate || '',
@@ -54,11 +64,15 @@ function doPost(e) {
             entryToUpdate.issueNote || ''
           ];
           sheet.getRange(i + 1, 1, 1, 13).setValues([rowData]);
+          found = true;
+          Logger.log('Row updated at: ' + (i + 1));
           break;
         }
       }
-      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Record updated' }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ 
+        status: found ? 'success' : 'error', 
+        message: found ? 'Record updated' : 'ID not found: ' + idToUpdate 
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // Default: CREATE

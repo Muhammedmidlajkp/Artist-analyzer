@@ -33,9 +33,9 @@ export default function AdminDashboard() {
     try {
       const resp = await fetchDashboardData();
       if (resp.status === 'success') setData(resp.data);
-      else setError('Failed to fetch data.');
+      else setError(resp.message || 'Failed to fetch data.');
     } catch (err) {
-      setError('Error fetching data.');
+      setError(err.message || 'Error fetching data.');
     } finally {
       setLoading(false);
     }
@@ -133,6 +133,24 @@ export default function AdminDashboard() {
         data: Object.values(grouped),
         backgroundColor: '#8b5cf6',
         borderRadius: 4
+      }]
+    };
+  }, [filteredData]);
+
+  // Chart Data: Satisfaction Overview
+  const satisfactionChartData = useMemo(() => {
+    const counts = { 'Satisfied': 0, 'Neutral': 0, 'Not Satisfied': 0 };
+    filteredData.forEach(d => {
+      if (d.satisfaction && counts.hasOwnProperty(d.satisfaction)) {
+        counts[d.satisfaction]++;
+      }
+    });
+    return {
+      labels: Object.keys(counts),
+      datasets: [{
+        data: Object.values(counts),
+        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+        hoverOffset: 4
       }]
     };
   }, [filteredData]);
@@ -261,30 +279,37 @@ export default function AdminDashboard() {
       </div>
 
       {/* Charts Layer 1 */}
-      <div className="grid-2 mb-6">
-        <div className="card" style={{ minHeight: '350px' }}>
+      <div className="grid-2 mb-6" style={{ gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)' }}>
+        <div className="card">
           <h3 className="mb-4">Revenue Over Time</h3>
-          <div style={{ height: '280px' }}>
+          <div style={{ height: '300px' }}>
             <Line data={revChartData} options={chartOptions} />
           </div>
         </div>
         
-        <div className="grid-2 text-primary" style={{ gap: '1.5rem' }}>
-          <div className="card" style={{ minHeight: '350px' }}>
-            <h3 className="mb-4">Artist Performance</h3>
-            <div style={{ height: '280px' }}>
-              <Bar data={artistChartData} options={chartOptions} />
-            </div>
-          </div>
-          
-          <div className="card" style={{ minHeight: '350px' }}>
-            <h3 className="mb-4">Source Distribution</h3>
-            <div style={{ height: '280px' }}>
-              <Doughnut data={sourceChartData} options={pieOptions} />
-            </div>
+        <div className="card">
+          <h3 className="mb-4">Satisfaction Overview</h3>
+          <div style={{ height: '300px' }}>
+            <Doughnut data={satisfactionChartData} options={pieOptions} />
           </div>
         </div>
+      </div>
 
+      {/* Charts Layer 2 */}
+      <div className="grid-2 mb-6">
+        <div className="card">
+          <h3 className="mb-4">Artist Performance</h3>
+          <div style={{ height: '300px' }}>
+            <Bar data={artistChartData} options={chartOptions} />
+          </div>
+        </div>
+        
+        <div className="card">
+          <h3 className="mb-4">Source Distribution</h3>
+          <div style={{ height: '300px' }}>
+            <Doughnut data={sourceChartData} options={pieOptions} />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Pencil, Trash2, X, Save } from 'lucide-react';
 import { fetchDashboardData, updateEntry, deleteEntry } from '../services/api';
+import Swal from 'sweetalert2';
 
 const ARTISTS = ['Nihala', 'Irfana', 'Sandra', 'Fidha', 'Anagha', 'Outsourcing'];
 const SOURCES = ['Social Media', 'Instagram', 'Reference', 'Other'];
@@ -30,24 +31,57 @@ export default function DataTable() {
       if (resp.status === 'success') {
         setData(resp.data);
       } else {
-        setError('Failed to fetch data from server.');
+        setError(resp.message || 'Failed to fetch data from server.');
       }
     } catch (err) {
-      setError('An error occurred during fetch.');
+      setError(err.message || 'An error occurred during fetch.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (recordId) => {
-    if (!window.confirm('Are you sure you want to delete this record? This action cannot be undone.')) return;
+    const result = await Swal.fire({
+      title: 'Delete Record?',
+      text: 'Are you sure you want to delete this record? This action cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, delete it',
+      confirmButtonColor: 'var(--danger)',
+      cancelButtonColor: 'var(--border-color)',
+      background: 'var(--bg-secondary)',
+      color: 'var(--text-primary)'
+    });
+
+    if (!result.isConfirmed) return;
     
     setActionLoading(true);
     try {
       await deleteEntry(recordId);
-      setData(data.filter(item => item.recordId !== recordId));
+      // Optimistic update
+      setData(prev => prev.filter(item => item.recordId !== recordId));
+      // Re-fetch to confirm sync
+      await loadData();
+      
+      Swal.fire({
+        title: 'Deleted!',
+        text: 'The record has been deleted.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)'
+      });
     } catch (err) {
-      alert('Failed to delete record.');
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to delete record. Please check your connection.',
+        icon: 'error',
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)',
+        confirmButtonColor: 'var(--accent-primary)'
+      });
+      loadData(); // Revert to server state
     } finally {
       setActionLoading(false);
     }
@@ -57,17 +91,37 @@ export default function DataTable() {
     e.preventDefault();
     setActionLoading(true);
     try {
-      // Recalculate total revenue just in case
       const pkg = parseFloat(editingRow.packagePrice) || 0;
       const extra = parseFloat(editingRow.extraCharges) || 0;
       const disc = parseFloat(editingRow.discount) || 0;
       editingRow.totalRevenue = (pkg + extra) - disc;
 
       await updateEntry(editingRow.recordId, editingRow);
-      setData(data.map(item => item.recordId === editingRow.recordId ? editingRow : item));
+      // Optimistic local update
+      setData(prev => prev.map(item => item.recordId === editingRow.recordId ? editingRow : item));
       setEditingRow(null);
+      // Re-fetch to confirm sync
+      await loadData();
+
+      Swal.fire({
+        title: 'Updated!',
+        text: 'The record has been successfully updated.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)'
+      });
     } catch (err) {
-      alert('Failed to update record.');
+      Swal.fire({
+        title: 'Update Failed',
+        text: 'Failed to update record. Please try again.',
+        icon: 'error',
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)',
+        confirmButtonColor: 'var(--accent-primary)'
+      });
+      loadData(); // Revert to server state
     } finally {
       setActionLoading(false);
     }

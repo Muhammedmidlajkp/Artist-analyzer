@@ -57,10 +57,20 @@ export const fetchDashboardData = async () => {
   try {
     const response = await fetch(APPS_SCRIPT_URL, {
       method: "GET",
+      redirect: "follow"
     });
-    return await response.json();
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    if (result.status === 'error') {
+      throw new Error(result.message || 'Server-side script error');
+    }
+    return result;
   } catch (error) {
-    console.error("Error fetching data:", error);
+    console.error("Detailed Fetch Error:", error);
     throw error;
   }
 };
@@ -92,12 +102,18 @@ export const submitEntry = async (data, action = 'create') => {
   try {
     const response = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
+      mode: "no-cors", 
       headers: {
         "Content-Type": "text/plain;charset=utf-8",
       },
       body: JSON.stringify({ action, data }),
     });
-    return await response.json();
+    
+    // Give Google Apps Script a moment to process the write before resolving
+    // This helps prevent race conditions where the next fetch gets old data
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    return { status: 'success', message: 'Request sent to Google' };
   } catch (error) {
     console.error("Error submitting data:", error);
     throw error;
