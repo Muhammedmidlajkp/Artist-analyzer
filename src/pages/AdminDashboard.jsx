@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { fetchDashboardData } from '../services/api';
-import { Loader2, IndianRupee, Users, Target, UserCheck } from 'lucide-react';
+import { Loader2, IndianRupee, Users, Target, UserCheck, MessageSquare, UserPlus, AlertTriangle } from 'lucide-react';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, 
   BarElement, Title, Tooltip, Legend, ArcElement, Filler
@@ -74,10 +74,7 @@ export default function AdminDashboard() {
     const totalRev = filteredData.reduce((acc, curr) => acc + (Number(curr.totalRevenue) || 0), 0);
     const totalLeads = filteredData.length;
     
-    // Simulate conversion (if we assume each entry is a converted lead, maybe we compare against a fake metric or total = 100%)
-    // Since we only have converted entries in this DB, Conversion Rate might just be 100% or calculated differently if there were failures.
-    // We'll show standard 100% for entries in the db, or mock a 45% based on 'leads vs booked' if data supported it.
-    // For now, let's keep it static visual per prompt constraints since no 'lead vs booked' status exists.
+    // Conversion Rate: Defaulting to 100% since all entries logged here are completed makeovers.
     const conversionRate = totalLeads > 0 ? "100%" : "0%"; 
 
     // Top artist calculation
@@ -93,7 +90,22 @@ export default function AdminDashboard() {
       if (artistScores[a] > maxRev) { maxRev = artistScores[a]; topArtist = a; }
     });
 
-    return { totalRev, totalLeads, conversionRate, topArtist };
+    // Top Referrer calculation
+    const referrerCounts = {};
+    filteredData.forEach(d => {
+      if (d.source === 'Reference') {
+        const ref = d.artistReference || d.referredBy || 'Other';
+        referrerCounts[ref] = (referrerCounts[ref] || 0) + 1;
+      }
+    });
+
+    let topReferrer = 'N/A';
+    let maxRef = 0;
+    Object.keys(referrerCounts).forEach(r => {
+      if (referrerCounts[r] > maxRef) { maxRef = referrerCounts[r]; topReferrer = r; }
+    });
+
+    return { totalRev, totalLeads, conversionRate, topArtist, topReferrer };
   }, [filteredData]);
 
   // Chart Data: Revenue Over Time
@@ -172,6 +184,89 @@ export default function AdminDashboard() {
     };
   }, [filteredData]);
 
+  // Chart Data: Reference Breakdown
+  const referenceChartData = useMemo(() => {
+    const grouped = {};
+    filteredData.forEach(d => {
+      if (d.source === 'Reference') {
+        const ref = d.artistReference || d.referredBy || 'Unknown';
+        grouped[ref] = (grouped[ref] || 0) + 1;
+      }
+    });
+    return {
+      labels: Object.keys(grouped),
+      datasets: [{
+        label: 'Referrals',
+        data: Object.values(grouped),
+        backgroundColor: '#3b82f6',
+        borderRadius: 4
+      }]
+    };
+  }, [filteredData]);
+
+  // Chart Data: Satisfaction by Artist (Stacked)
+  const satisfactionByArtistData = useMemo(() => {
+    const artistList = artists.filter(a => a !== 'All');
+    const datasets = [
+      { label: 'Satisfied', data: [], backgroundColor: '#10b981' },
+      { label: 'Neutral', data: [], backgroundColor: '#f59e0b' },
+      { label: 'Not Satisfied', data: [], backgroundColor: '#ef4444' }
+    ];
+
+    artistList.forEach(artist => {
+      const artistData = filteredData.filter(d => d.artist === artist);
+      datasets[0].data.push(artistData.filter(d => d.satisfaction === 'Satisfied').length);
+      datasets[1].data.push(artistData.filter(d => d.satisfaction === 'Neutral').length);
+      datasets[2].data.push(artistData.filter(d => d.satisfaction === 'Not Satisfied').length);
+    });
+
+    return { labels: artistList, datasets };
+  }, [filteredData, artists]);
+
+  // Critical Issues
+  const criticalIssues = useMemo(() => {
+    return filteredData
+      .filter(d => d.satisfaction === 'Not Satisfied')
+      .sort((a, b) => parseDate(b.eventDate) - parseDate(a.eventDate));
+  }, [filteredData]);
+
+  // Comprehensive Referral Analysis
+  const referralAnalysis = useMemo(() => {
+    const rawRefs = filteredData.filter(d => d.source === 'Reference');
+    
+    // Aggregate by Referrer
+    const stats = {};
+    rawRefs.forEach(d => {
+      const ref = d.artistReference || d.referredBy || 'Unknown Source';
+      if (!stats[ref]) {
+        stats[ref] = { name: ref, count: 0, revenue: 0, events: [] };
+      }
+      stats[ref].count++;
+      stats[ref].revenue += (Number(d.totalRevenue) || 0);
+      stats[ref].events.push(d);
+    });
+
+    // Leaderboard (Sorted by Revenue)
+    const leaderboard = Object.values(stats).sort((a, b) => b.revenue - a.revenue);
+
+    // Detailed Log (Sorted by Date)
+    const log = [...rawRefs].sort((a, b) => parseDate(b.eventDate) - parseDate(a.eventDate));
+
+    return { leaderboard, log };
+  }, [filteredData]);
+
+  const stackedOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#94a3b8' } },
+    },
+    scales: {
+      x: { stacked: true, ticks: { color: '#64748b' }, grid: { display: false } },
+      y: { stacked: true, ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+  };
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -239,7 +334,7 @@ export default function AdminDashboard() {
       ) : null}
 
       {/* KPI Cards */}
-      <div className="grid-4 mb-6">
+      <div className="grid-5 mb-6">
         <div className="card flex items-center justify-between">
           <div>
             <div className="text-secondary mb-1" style={{ fontSize: '0.875rem' }}>Total Revenue</div>
@@ -251,20 +346,11 @@ export default function AdminDashboard() {
         </div>
         <div className="card flex items-center justify-between">
           <div>
-            <div className="text-secondary mb-1" style={{ fontSize: '0.875rem' }}>Total Leads</div>
+            <div className="text-secondary mb-1" style={{ fontSize: '0.875rem' }}>Total Sales</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{kpis.totalLeads}</div>
           </div>
           <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', borderRadius: 'var(--radius-md)' }}>
             <Users size={24} />
-          </div>
-        </div>
-        <div className="card flex items-center justify-between">
-          <div>
-            <div className="text-secondary mb-1" style={{ fontSize: '0.875rem' }}>Conversion Rate</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{kpis.conversionRate}</div>
-          </div>
-          <div style={{ padding: '0.75rem', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', borderRadius: 'var(--radius-md)' }}>
-            <Target size={24} />
           </div>
         </div>
         <div className="card flex items-center justify-between">
@@ -274,6 +360,24 @@ export default function AdminDashboard() {
           </div>
           <div style={{ padding: '0.75rem', backgroundColor: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6', borderRadius: 'var(--radius-md)' }}>
             <UserCheck size={24} />
+          </div>
+        </div>
+        <div className="card flex items-center justify-between">
+          <div>
+            <div className="text-secondary mb-1" style={{ fontSize: '0.875rem' }}>Top Referrer</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{kpis.topReferrer}</div>
+          </div>
+          <div style={{ padding: '0.75rem', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)', borderRadius: 'var(--radius-md)' }}>
+            <UserPlus size={24} />
+          </div>
+        </div>
+        <div className="card flex items-center justify-between">
+          <div>
+            <div className="text-secondary mb-1" style={{ fontSize: '0.875rem' }}>Lead Health</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{kpis.conversionRate}</div>
+          </div>
+          <div style={{ padding: '0.75rem', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', borderRadius: 'var(--radius-md)' }}>
+            <Target size={24} />
           </div>
         </div>
       </div>
@@ -305,9 +409,140 @@ export default function AdminDashboard() {
         </div>
         
         <div className="card">
+          <h3 className="mb-4">Reference Performance</h3>
+          <div style={{ height: '300px' }}>
+            <Bar data={referenceChartData} options={chartOptions} />
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Layer 3 */}
+      <div className="grid-2 mb-6" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
+        <div className="card">
           <h3 className="mb-4">Source Distribution</h3>
           <div style={{ height: '300px' }}>
             <Doughnut data={sourceChartData} options={pieOptions} />
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 className="mb-4">Satisfaction Deep-Dive (By Artist)</h3>
+          <div style={{ height: '300px' }}>
+            <Bar data={satisfactionByArtistData} options={stackedOptions} />
+          </div>
+        </div>
+      </div>
+
+      {/* Critical Issues Log */}
+      <div className="card mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertTriangle color="var(--danger)" size={20} />
+          <h3 style={{ margin: 0 }}>Critical Customer Issues</h3>
+        </div>
+        <div className="table-container">
+          <table className="data-table" style={{ fontSize: '0.875rem' }}>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Bride Name</th>
+                <th>Artist</th>
+                <th>Issue Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {criticalIssues.length > 0 ? (
+                criticalIssues.map((issue, idx) => (
+                  <tr key={idx}>
+                    <td>{issue.eventDate?.split('T')[0]}</td>
+                    <td style={{ fontWeight: 600 }}>{issue.brideName}</td>
+                    <td>{issue.artist}</td>
+                    <td style={{ color: 'var(--danger)', fontStyle: 'italic' }}>
+                      <MessageSquare size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                      {issue.issueNote || 'No note provided'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    No critical issues reported. Great job!
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Referral Analytics Deep-Dive */}
+      <div className="grid-2 mb-6" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr)' }}>
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <UserPlus color="var(--accent-primary)" size={20} />
+            <h3 style={{ margin: 0 }}>Referrer Leaderboard</h3>
+          </div>
+          <div className="table-container">
+            <table className="data-table" style={{ fontSize: '0.875rem' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '40px' }}>#</th>
+                  <th>Referrer</th>
+                  <th>Sales</th>
+                  <th style={{ textAlign: 'right' }}>Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referralAnalysis.leaderboard.length > 0 ? (
+                  referralAnalysis.leaderboard.map((ref, idx) => (
+                    <tr key={idx}>
+                      <td>{idx + 1}</td>
+                      <td style={{ fontWeight: 600 }}>{ref.name}</td>
+                      <td>{ref.count}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>₹{ref.revenue.toLocaleString()}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>No referral data found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Users color="var(--success)" size={20} />
+            <h3 style={{ margin: 0 }}>Referral Relationship Log</h3>
+          </div>
+          <div className="table-container">
+            <table className="data-table" style={{ fontSize: '0.875rem' }}>
+              <thead>
+                <tr>
+                  <th>Referrer (Artist)</th>
+                  <th>Referred By</th>
+                  <th>Date</th>
+                  <th style={{ textAlign: 'right' }}>Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referralAnalysis.log.length > 0 ? (
+                  referralAnalysis.log.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ color: 'var(--text-secondary)' }}>{item.artistReference || 'None'}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase' }}>{item.referredBy || 'No Source'}</td>
+                      <td>{item.eventDate?.split('T')[0]}</td>
+                      <td style={{ textAlign: 'right' }}>₹{(Number(item.totalRevenue) || 0).toLocaleString()}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>No referral history found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

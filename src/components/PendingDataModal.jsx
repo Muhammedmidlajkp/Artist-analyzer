@@ -12,7 +12,7 @@ export default function PendingDataModal({ entries, onClose, onRestore, onDelete
             <X size={20} />
           </button>
         </div>
-        
+
         <p className="text-secondary mb-4" style={{ fontSize: '0.875rem' }}>
           You have incomplete or unsaved entries.
         </p>
@@ -27,16 +27,16 @@ export default function PendingDataModal({ entries, onClose, onRestore, onDelete
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
-                  className="btn btn-secondary" 
+                <button
+                  className="btn btn-secondary"
                   style={{ padding: '0.5rem' }}
                   onClick={() => onRestore(entry)}
                   title="Edit & Resubmit"
                 >
                   <Edit size={16} />
                 </button>
-                <button 
-                  className="btn btn-secondary" 
+                <button
+                  className="btn btn-secondary"
                   style={{ padding: '0.5rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}
                   onClick={() => onDelete(entry._id)}
                   title="Delete"
