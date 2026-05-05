@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
-import { LayoutDashboard, FilePlus, Table } from 'lucide-react';
+import { LayoutDashboard, FilePlus, Table, Users } from 'lucide-react';
 
 export default function Layout() {
   const location = useLocation();
@@ -8,6 +8,7 @@ export default function Layout() {
     { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard size={18} /> },
     { name: 'Add Data', path: '/', icon: <FilePlus size={18} /> },
     { name: 'View Table', path: '/table', icon: <Table size={18} /> },
+    { name: 'Referral Tracking', path: '/referrals', icon: <Users size={18} /> },
   ];
 
   return (

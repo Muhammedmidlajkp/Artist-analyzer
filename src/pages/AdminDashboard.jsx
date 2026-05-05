@@ -2,13 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { fetchDashboardData } from '../services/api';
 import { Loader2, IndianRupee, Users, Target, UserCheck, MessageSquare, UserPlus, AlertTriangle } from 'lucide-react';
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, 
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, Title, Tooltip, Legend, ArcElement, Filler
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(
-  CategoryScale, LinearScale, PointElement, LineElement, 
+  CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, Title, Tooltip, Legend, ArcElement, Filler
 );
 
@@ -51,20 +51,20 @@ export default function AdminDashboard() {
       let pass = true;
       if (artistFilter !== 'All' && row.artist !== artistFilter) pass = false;
       if (sourceFilter !== 'All' && row.source !== sourceFilter) pass = false;
-      
+
       // Basic time filtering logic based on proximity to "today"
       if (timeFilter !== 'All' && row.eventDate) {
-         const rowDate = parseDate(row.eventDate);
-         const now = new Date();
-         const diffTime = Math.abs(now - rowDate);
-         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-         
-         if (timeFilter === 'Day' && diffDays > 1) pass = false;
-         if (timeFilter === 'Week' && diffDays > 7) pass = false;
-         if (timeFilter === 'Month' && diffDays > 30) pass = false;
-         if (timeFilter === 'Year' && diffDays > 365) pass = false;
+        const rowDate = parseDate(row.eventDate);
+        const now = new Date();
+        const diffTime = Math.abs(now - rowDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (timeFilter === 'Day' && diffDays > 1) pass = false;
+        if (timeFilter === 'Week' && diffDays > 7) pass = false;
+        if (timeFilter === 'Month' && diffDays > 30) pass = false;
+        if (timeFilter === 'Year' && diffDays > 365) pass = false;
       }
-      
+
       return pass;
     });
   }, [data, timeFilter, artistFilter, sourceFilter]);
@@ -73,9 +73,9 @@ export default function AdminDashboard() {
   const kpis = useMemo(() => {
     const totalRev = filteredData.reduce((acc, curr) => acc + (Number(curr.totalRevenue) || 0), 0);
     const totalLeads = filteredData.length;
-    
+
     // Conversion Rate: Defaulting to 100% since all entries logged here are completed makeovers.
-    const conversionRate = totalLeads > 0 ? "100%" : "0%"; 
+    const conversionRate = totalLeads > 0 ? "100%" : "0%";
 
     // Top artist calculation
     const artistScores = {};
@@ -83,7 +83,7 @@ export default function AdminDashboard() {
       if (!d.artist) return;
       artistScores[d.artist] = (artistScores[d.artist] || 0) + (Number(d.totalRevenue) || 0);
     });
-    
+
     let topArtist = 'N/A';
     let maxRev = 0;
     Object.keys(artistScores).forEach(a => {
@@ -116,8 +116,8 @@ export default function AdminDashboard() {
       if (!d.eventDate) return;
       grouped[d.eventDate] = (grouped[d.eventDate] || 0) + (Number(d.totalRevenue) || 0);
     });
-    const sortedKeys = Object.keys(grouped).sort((a,b) => parseDate(a) - parseDate(b));
-    
+    const sortedKeys = Object.keys(grouped).sort((a, b) => parseDate(a) - parseDate(b));
+
     return {
       labels: sortedKeys,
       datasets: [{
@@ -233,7 +233,7 @@ export default function AdminDashboard() {
   // Comprehensive Referral Analysis
   const referralAnalysis = useMemo(() => {
     const rawRefs = filteredData.filter(d => d.source === 'Reference');
-    
+
     // Aggregate by Referrer
     const stats = {};
     rawRefs.forEach(d => {
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
             <Line data={revChartData} options={chartOptions} />
           </div>
         </div>
-        
+
         <div className="card">
           <h3 className="mb-4">Satisfaction Overview</h3>
           <div style={{ height: '300px' }}>
@@ -407,7 +407,7 @@ export default function AdminDashboard() {
             <Bar data={artistChartData} options={chartOptions} />
           </div>
         </div>
-        
+
         <div className="card">
           <h3 className="mb-4">Reference Performance</h3>
           <div style={{ height: '300px' }}>

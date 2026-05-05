@@ -1,5 +1,5 @@
 const PENDING_STORAGE_KEY = 'makeover_pending_data';
-const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL || '';
+import { BACKEND_URL } from '../constants/api';
 
 // --- Local Storage for Pending Data ---
 
@@ -46,74 +46,36 @@ let mockData = [
 ];
 
 export const fetchDashboardData = async () => {
-  if (!APPS_SCRIPT_URL) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ status: 'success', data: mockData });
-      }, MOCK_DELAY);
-    });
-  }
-
   try {
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: "GET",
-      redirect: "follow"
-    });
+    const response = await fetch(BACKEND_URL);
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
     }
     
     const result = await response.json();
-    if (result.status === 'error') {
-      throw new Error(result.message || 'Server-side script error');
-    }
     return result;
   } catch (error) {
-    console.error("Detailed Fetch Error:", error);
+    console.error("Fetch Error:", error.message);
     throw error;
   }
 };
 
 export const submitEntry = async (data, action = 'create') => {
-  if (!APPS_SCRIPT_URL) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const entries = Array.isArray(data) ? data : [data];
-        
-        if (action === 'delete') {
-          const id = entries[0].recordId;
-          mockData = mockData.filter(m => m.recordId !== id);
-        } else if (action === 'update') {
-          const updated = entries[0];
-          mockData = mockData.map(m => m.recordId === updated.recordId ? { ...m, ...updated } : m);
-        } else {
-          // create
-          entries.forEach(e => {
-            if (!e.recordId) e.recordId = 'ID-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-          });
-          mockData.push(...entries);
-        }
-        resolve({ status: 'success', data });
-      }, MOCK_DELAY);
-    });
-  }
-
   try {
-    const response = await fetch(APPS_SCRIPT_URL, {
+    const response = await fetch(BACKEND_URL, {
       method: "POST",
-      mode: "no-cors", 
       headers: {
-        "Content-Type": "text/plain;charset=utf-8",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ action, data }),
     });
     
-    // Give Google Apps Script a moment to process the write before resolving
-    // This helps prevent race conditions where the next fetch gets old data
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    return { status: 'success', message: 'Request sent to Google' };
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    return await response.json();
   } catch (error) {
     console.error("Error submitting data:", error);
     throw error;

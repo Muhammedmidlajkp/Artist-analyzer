@@ -3,7 +3,8 @@ import Layout from './components/Layout';
 import EmployeePanel from './pages/EmployeePanel';
 import DataTable from './pages/DataTable';
 import AdminDashboard from './pages/AdminDashboard';
-import './index.css';
+import ReferralTracking from './pages/ReferralTracking';
+import './styles/App.css';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route index element={<EmployeePanel />} />
           <Route path="table" element={<DataTable />} />
           <Route path="admin" element={<AdminDashboard />} />
+          <Route path="referrals" element={<ReferralTracking />} />
         </Route>
       </Routes>
     </Router>

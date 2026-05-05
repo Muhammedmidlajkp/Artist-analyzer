@@ -12,7 +12,7 @@ export default function DataTable() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   const [search, setSearch] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'eventDate', direction: 'desc' });
 
@@ -54,7 +54,7 @@ export default function DataTable() {
     });
 
     if (!result.isConfirmed) return;
-    
+
     setActionLoading(true);
     try {
       await deleteEntry(recordId);
@@ -62,7 +62,7 @@ export default function DataTable() {
       setData(prev => prev.filter(item => item.recordId !== recordId));
       // Re-fetch to confirm sync
       await loadData();
-      
+
       Swal.fire({
         title: 'Deleted!',
         text: 'The record has been deleted.',
@@ -145,8 +145,8 @@ export default function DataTable() {
     return 0;
   });
 
-  const filteredData = sortedData.filter(row => 
-    Object.values(row).some(val => 
+  const filteredData = sortedData.filter(row =>
+    Object.values(row).some(val =>
       String(val).toLowerCase().includes(search.toLowerCase())
     )
   );
@@ -158,13 +158,13 @@ export default function DataTable() {
           <h1 className="page-title">Makeover Entries</h1>
           <p className="page-subtitle">View and search all submitted makeover records.</p>
         </div>
-        
+
         <div style={{ position: 'relative', width: '300px' }}>
           <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input 
-            type="text" 
-            placeholder="Search any field..." 
-            className="form-input" 
+          <input
+            type="text"
+            placeholder="Search any field..."
+            className="form-input"
             style={{ paddingLeft: '2.5rem' }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -174,7 +174,7 @@ export default function DataTable() {
 
       {loading ? (
         <div className="flex justify-center items-center" style={{ padding: '4rem 0', color: 'var(--text-muted)' }}>
-          <Loader2 className="spinner" size={24} style={{ marginRight: '0.5rem', borderWidth: '2px' }} /> 
+          <Loader2 className="spinner" size={24} style={{ marginRight: '0.5rem', borderWidth: '2px' }} />
           Loading data...
         </div>
       ) : error ? (
@@ -211,30 +211,30 @@ export default function DataTable() {
                     <td style={{ color: 'var(--danger)' }}>-₹{Number(row.discount || 0).toLocaleString()}</td>
                     <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>₹{Number(row.totalRevenue || 0).toLocaleString()}</td>
                     <td>
-                      <span style={{ 
-                        fontSize: '0.75rem', 
-                        padding: '0.25rem 0.5rem', 
+                      <span style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.5rem',
                         borderRadius: '12px',
-                        backgroundColor: row.satisfaction === 'Satisfied' ? 'rgba(16, 185, 129, 0.1)' : 
-                                         row.satisfaction === 'Not Satisfied' ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-tertiary)',
-                        color: row.satisfaction === 'Satisfied' ? 'var(--success)' : 
-                               row.satisfaction === 'Not Satisfied' ? 'var(--danger)' : 'var(--text-primary)'
+                        backgroundColor: row.satisfaction === 'Satisfied' ? 'rgba(16, 185, 129, 0.1)' :
+                          row.satisfaction === 'Not Satisfied' ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-tertiary)',
+                        color: row.satisfaction === 'Satisfied' ? 'var(--success)' :
+                          row.satisfaction === 'Not Satisfied' ? 'var(--danger)' : 'var(--text-primary)'
                       }}>
                         {row.satisfaction || '-'}
                       </span>
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.75rem' }}>
-                        <button 
-                          onClick={() => setEditingRow({...row})} 
-                          className="btn-action-edit" 
+                        <button
+                          onClick={() => setEditingRow({ ...row })}
+                          className="btn-action-edit"
                           title="Edit"
                         >
                           <Pencil size={18} />
                         </button>
-                        <button 
-                          onClick={() => handleDelete(row.recordId)} 
-                          className="btn-action-delete" 
+                        <button
+                          onClick={() => handleDelete(row.recordId)}
+                          className="btn-action-delete"
                           title="Delete"
                           disabled={actionLoading}
                         >
@@ -246,7 +246,7 @@ export default function DataTable() {
                 ))
               ) : (
                 <tr>
-                   <td colSpan="10" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                     No matching records found.
                   </td>
                 </tr>
@@ -271,27 +271,27 @@ export default function DataTable() {
               <div className="grid-2">
                 <div className="form-group">
                   <label className="form-label">Event Date</label>
-                  <input 
-                    type="date" 
-                    value={editingRow.eventDate} 
-                    onChange={e => setEditingRow({...editingRow, eventDate: e.target.value})} 
-                    className="form-input" 
+                  <input
+                    type="date"
+                    value={editingRow.eventDate}
+                    onChange={e => setEditingRow({ ...editingRow, eventDate: e.target.value })}
+                    className="form-input"
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Bride Name</label>
-                  <input 
-                    type="text" 
-                    value={editingRow.brideName} 
-                    onChange={e => setEditingRow({...editingRow, brideName: e.target.value})} 
-                    className="form-input" 
+                  <input
+                    type="text"
+                    value={editingRow.brideName}
+                    onChange={e => setEditingRow({ ...editingRow, brideName: e.target.value })}
+                    className="form-input"
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Source</label>
-                  <select 
-                    value={editingRow.source} 
-                    onChange={e => setEditingRow({...editingRow, source: e.target.value})} 
+                  <select
+                    value={editingRow.source}
+                    onChange={e => setEditingRow({ ...editingRow, source: e.target.value })}
                     className="form-select"
                   >
                     {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -299,9 +299,9 @@ export default function DataTable() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Artist</label>
-                  <select 
-                    value={editingRow.artist} 
-                    onChange={e => setEditingRow({...editingRow, artist: e.target.value})} 
+                  <select
+                    value={editingRow.artist}
+                    onChange={e => setEditingRow({ ...editingRow, artist: e.target.value })}
                     className="form-select"
                   >
                     {ARTISTS.map(a => <option key={a} value={a}>{a}</option>)}
@@ -309,36 +309,36 @@ export default function DataTable() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Package Price</label>
-                  <input 
-                    type="number" 
-                    value={editingRow.packagePrice} 
-                    onChange={e => setEditingRow({...editingRow, packagePrice: e.target.value})} 
-                    className="form-input" 
+                  <input
+                    type="number"
+                    value={editingRow.packagePrice}
+                    onChange={e => setEditingRow({ ...editingRow, packagePrice: e.target.value })}
+                    className="form-input"
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Extra Charges</label>
-                  <input 
-                    type="number" 
-                    value={editingRow.extraCharges} 
-                    onChange={e => setEditingRow({...editingRow, extraCharges: e.target.value})} 
-                    className="form-input" 
+                  <input
+                    type="number"
+                    value={editingRow.extraCharges}
+                    onChange={e => setEditingRow({ ...editingRow, extraCharges: e.target.value })}
+                    className="form-input"
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Discount</label>
-                  <input 
-                    type="number" 
-                    value={editingRow.discount} 
-                    onChange={e => setEditingRow({...editingRow, discount: e.target.value})} 
-                    className="form-input" 
+                  <input
+                    type="number"
+                    value={editingRow.discount}
+                    onChange={e => setEditingRow({ ...editingRow, discount: e.target.value })}
+                    className="form-input"
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Satisfaction</label>
-                  <select 
-                    value={editingRow.satisfaction} 
-                    onChange={e => setEditingRow({...editingRow, satisfaction: e.target.value})} 
+                  <select
+                    value={editingRow.satisfaction}
+                    onChange={e => setEditingRow({ ...editingRow, satisfaction: e.target.value })}
                     className="form-select"
                   >
                     {SATISFACTION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -346,9 +346,9 @@ export default function DataTable() {
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label">Issue Note</label>
-                  <textarea 
-                    value={editingRow.issueNote} 
-                    onChange={e => setEditingRow({...editingRow, issueNote: e.target.value})} 
+                  <textarea
+                    value={editingRow.issueNote}
+                    onChange={e => setEditingRow({ ...editingRow, issueNote: e.target.value })}
                     className="form-input"
                     style={{ minHeight: '80px' }}
                   />
